@@ -1,0 +1,17 @@
+{
+  "name": "Wordeck - английские слова",
+  "short_name": "Wordeck",
+  "description": "Карточки для изучения английских слов: NGSL, Oxford 3000 и 5000",
+  "lang": "ru",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#EEF0F5",
+  "theme_color": "#EEF0F5",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
