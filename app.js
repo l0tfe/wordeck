@@ -1,7 +1,7 @@
 'use strict';
 (function () {
   // ---------------------------------------------------------------- constants
-  const KEY = 'wordeck.v1', IMGKEY = 'wordeck.img.v1';
+  const KEY = 'wordeck.v1';
   const MIN = 60e3, H = 60 * MIN, DAY = 24 * H;
   // first review 4 h after training, then 1, 3, 7, 21, 60 days; after the 6th successful review the word is learned
   const INTERVALS = [4 * H, DAY, 3 * DAY, 7 * DAY, 21 * DAY, 60 * DAY];
@@ -11,7 +11,7 @@
   const TOPICS = [['f', 'Еда и напитки'], ['a', 'Животные'], ['n', 'Природа и погода'], ['b', 'Тело и здоровье'], ['h', 'Дом и быт'], ['c', 'Одежда и внешность'], ['p', 'Люди и семья'], ['m', 'Чувства и характер'], ['t', 'Путешествия и транспорт'], ['l', 'Город и места'], ['w', 'Работа и бизнес'], ['$', 'Деньги и покупки'], ['e', 'Учёба и наука'], ['i', 'Технологии'], ['r', 'Искусство и медиа'], ['s', 'Спорт и досуг'], ['g', 'Общество и право'], ['d', 'Время и числа']];
   const LEVELS = [['A1', 'Начальный'], ['A2', 'Элементарный'], ['B1', 'Средний'], ['B2', 'Выше среднего'], ['C1', 'Продвинутый']];
   const CR = { A1: 1, A2: 2, B1: 3, B2: 4, C1: 5 };
-  const DEF_SET = { theme: 'system', voice: 'uk', ttsVoice: '', rate: 1, autoplay: true, showRu: true, goal: 10, batch: 5, images: true };
+  const DEF_SET = { theme: 'system', voice: 'uk', ttsVoice: '', rate: 1, autoplay: true, showRu: true, goal: 10, batch: 5, images: 'all' };
 
   const I = {
     close: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
@@ -27,7 +27,7 @@
   };
 
   // ---------------------------------------------------------------- data
-  const W = (window.WORDS || []).map((r, i) => ({ i, w: r[0], ru: r[1], pos: r[2] ? r[2].split(',') : [], cefr: r[3], ipa: r[4], def: r[5], ex: r[6], topic: r[7], ngsl: r[8], ox: r[9], uk: r[10], us: r[11] }));
+  const W = (window.WORDS || []).map((r, i) => ({ i, w: r[0], ru: r[1], pos: r[2] ? r[2].split(',') : [], cefr: r[3], ipa: r[4], def: r[5], ex: r[6], topic: r[7], ngsl: r[8], ox: r[9], uk: r[10], us: r[11], emoji: r[12] || '', photo: r[13] || '' }));
   const BY = new Map(W.map(x => [x.w, x]));
   const byFreq = (a, b) => (a.ngsl || 9999) - (b.ngsl || 9999) || (CR[a.cefr] || 9) - (CR[b.cefr] || 9) || a.w.localeCompare(b.w);
   const byLevel = (a, b) => (CR[a.cefr] || 9) - (CR[b.cefr] || 9) || (a.ngsl || 9999) - (b.ngsl || 9999) || a.w.localeCompare(b.w);
@@ -49,7 +49,7 @@
   function load() {
     try {
       const j = JSON.parse(localStorage.getItem(KEY));
-      if (j && typeof j === 'object') return { words: j.words || {}, days: j.days || {}, sel: (j.sel || []).filter(id => SEC.has(id)), set: Object.assign({}, DEF_SET, j.set || {}) };
+      if (j && typeof j === 'object') { const set = Object.assign({}, DEF_SET, j.set || {}); if (set.images === true) set.images = 'all'; if (set.images === false) set.images = 'off'; delete set.order; return { words: j.words || {}, days: j.days || {}, sel: (j.sel || []).filter(id => SEC.has(id)), set }; }
     } catch (e) { /* storage unavailable */ }
     return { words: {}, days: {}, sel: [], set: Object.assign({}, DEF_SET) };
   }
@@ -58,11 +58,6 @@
   let saveT = 0;
   function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* ignore */ } }
   function saveSoon() { clearTimeout(saveT); saveT = setTimeout(save, 400); }
-  let IMG = {};
-  try { IMG = JSON.parse(localStorage.getItem(IMGKEY)) || {}; } catch (e) { IMG = {}; }
-  let imgT = 0;
-  function saveImg() { clearTimeout(imgT); imgT = setTimeout(() => { try { localStorage.setItem(IMGKEY, JSON.stringify(IMG)); } catch (e) { /* quota */ } }, 800); }
-
   const dayKey = (d = new Date()) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   function day(k = dayKey()) { return S.days[k] || (S.days[k] = { n: 0, k: 0, r: 0, d: 0, s: 0 }); }
   const peekDay = k => S.days[k] || { n: 0, k: 0, r: 0, d: 0, s: 0 };
@@ -151,72 +146,52 @@
     tts(x.w);
   }
 
-  // ---------------------------------------------------------------- images
-  const pendingImg = new Map();
-  const picURL = s => s.startsWith('o:') ? 'https://api.openverse.org/v1/images/' + s.slice(2) + '/thumb/' : s;
-  const wantsImage = x => S.set.images && !(x.pos.length && x.pos.every(p => FUNC_POS.has(p)));
-  function imagesFor(x) {
-    if (IMG[x.w]) return Promise.resolve(IMG[x.w]);
-    if (pendingImg.has(x.w)) return pendingImg.get(x.w);
-    const p = (async () => {
-      let list = [], answered = false;
-      try {
-        const r = await fetch('https://api.openverse.org/v1/images/?q=' + encodeURIComponent(x.w) + '&page_size=8&mature=false');
-        if (r.ok) { answered = true; const j = await r.json(); list = (j.results || []).filter(o => o.id).slice(0, 6).map(o => 'o:' + o.id); }
-      } catch (e) { /* offline or blocked */ }
-      if (!list.length) {
-        try {
-          const r = await fetch('https://en.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(x.w.replace(/ /g, '_')));
-          if (r.ok || r.status === 404) answered = true;
-          if (r.ok) { const j = await r.json(); if (j.type === 'standard' && j.thumbnail && j.thumbnail.source) list = [j.thumbnail.source]; }
-        } catch (e) { /* offline */ }
-      }
-      const entry = { l: list, i: 0 };
-      if (answered) { IMG[x.w] = entry; saveImg(); }
-      pendingImg.delete(x.w);
-      return entry;
-    })();
-    pendingImg.set(x.w, p);
-    return p;
+  // ---------------------------------------------------------------- pictures
+  // photo: hand-checked Wikimedia Commons image; emoji: hand-picked; otherwise a type-only card
+  const photoURL = f => 'https://commons.wikimedia.org/wiki/Special:FilePath/' + encodeURIComponent(f.replace(/ /g, '_')) + '?width=800';
+  function hashW(w) { let h = 7; for (let i = 0; i < w.length; i++) h = (h * 31 + w.charCodeAt(i)) | 0; return Math.abs(h); }
+  function mediaKind(x) {
+    const m = S.set.images;
+    if (m === 'off') return 'type';
+    if (m === 'all' && x.photo) return 'photo';
+    if (x.emoji) return 'emoji';
+    return 'type';
   }
-  const picHTML = (x, cls) => '<div class="pic ' + (cls || '') + '" data-pic="' + esc(x.w) + '"><div class="pic-ph">' + esc(x.w.charAt(0)) + '</div><span class="pic-hint">другая картинка</span></div>';
-  function fillPics(root) { $$('[data-pic]', root).forEach(el => { const x = BY.get(el.dataset.pic); if (x) loadPic(el, x); }); }
-  function loadPic(el, x) {
-    if (!wantsImage(x)) { el.classList.add('noimg'); return; }
-    el.classList.add('loading');
-    imagesFor(x).then(e => {
-      el.classList.remove('loading');
-      if (!e.l.length) { el.classList.add('noimg'); return; }
-      showPic(el, x, e.i || 0, 0);
+  function typeSize(w) { return Math.max(34, Math.min(92, Math.floor(560 / Math.max(4, w.length)))); }
+  function mediaHTML(x, kind) {
+    kind = kind || mediaKind(x);
+    const both = S.set.images === 'all' && x.photo && x.emoji;
+    const attrs = ' data-media="' + esc(x.w) + '" data-kind="' + kind + '"' + (both ? ' data-both="1"' : '');
+    if (kind === 'photo') return '<div class="media photo g' + (hashW(x.w) % 8) + '"' + attrs + '><span class="emo-ch ph-fallback">' + (x.emoji || '') + '</span><img class="ph" alt="" draggable="false" referrerpolicy="no-referrer" src="' + esc(photoURL(x.photo)) + '"></div>';
+    if (kind === 'emoji') return '<div class="media emoji g' + (hashW(x.w) % 8) + '"' + attrs + '><span class="emo-ch">' + x.emoji + '</span></div>';
+    return '<div class="media type v' + (hashW(x.w) % 6) + '"' + attrs + '><span class="type-w" style="font-size:' + typeSize(x.w) + 'px">' + esc(x.w) + '</span></div>';
+  }
+  function bindMedia(root) {
+    $$('img.ph', root).forEach(img => {
+      const box = img.closest('.media');
+      const ok = () => box.classList.add('loaded');
+      if (img.complete && img.naturalWidth) ok(); else img.addEventListener('load', ok, { once: true });
+      img.addEventListener('error', () => {
+        const x = BY.get(box.dataset.media); if (!x || !box.isConnected) return;
+        const t = document.createElement('div'); t.innerHTML = mediaHTML(x, x.emoji ? 'emoji' : 'type');
+        const nb = t.firstChild; nb.removeAttribute('data-both'); box.replaceWith(nb);
+      }, { once: true });
     });
   }
-  function showPic(el, x, i, attempt) {
-    const e = IMG[x.w] || { l: [] };
-    if (!e.l.length || attempt >= e.l.length) { el.classList.add('noimg'); return; }
-    const idx = i % e.l.length;
-    const img = new Image();
-    img.alt = x.w; img.decoding = 'async'; img.referrerPolicy = 'no-referrer'; img.draggable = false;
-    img.onload = () => {
-      const old = el.querySelector('img'); if (old) old.remove();
-      img.className = 'pic-img'; el.appendChild(img);
-      el.classList.add('has'); el.classList.toggle('multi', e.l.length > 1);
-      if (e.i !== idx) { e.i = idx; saveImg(); }
-    };
-    img.onerror = () => showPic(el, x, idx + 1, attempt + 1);
-    img.src = picURL(e.l[idx]);
+  function toggleMedia(box) {
+    if (!box || !box.dataset.both) return;
+    const x = BY.get(box.dataset.media); if (!x) return;
+    const t = document.createElement('div'); t.innerHTML = mediaHTML(x, box.dataset.kind === 'photo' ? 'emoji' : 'photo');
+    const nb = t.firstChild; box.replaceWith(nb); bindMedia(nb.parentNode);
   }
-  function nextPic(el) {
-    const x = BY.get(el.dataset.pic), e = x && IMG[x.w];
-    if (e && e.l.length > 1) showPic(el, x, (e.i || 0) + 1, 0);
-  }
-  function prefetch(list) { list.forEach(x => { if (x && wantsImage(x)) imagesFor(x).then(e => { if (e.l.length) { const im = new Image(); im.referrerPolicy = 'no-referrer'; im.src = picURL(e.l[e.i || 0]); } }); }); }
+  function prefetch(list) { list.forEach(x => { if (x && mediaKind(x) === 'photo') { const im = new Image(); im.referrerPolicy = 'no-referrer'; im.src = photoURL(x.photo); } }); }
 
   // ---------------------------------------------------------------- theme
   function applyTheme() {
     const t = S.set.theme, root = document.documentElement;
     if (t === 'light' || t === 'dark') root.dataset.theme = t; else root.removeAttribute('data-theme');
     const dark = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
-    $('meta[name="theme-color"]').setAttribute('content', dark ? '#0E1015' : '#EEF0F5');
+    $$('meta[name="theme-color"]').forEach(m => { m.setAttribute('content', dark ? '#000000' : '#F5F5F7'); m.removeAttribute('media'); });
   }
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 
@@ -250,39 +225,50 @@
     const now = new Date(), weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 6);
     const wk = dayKey(weekAgo);
     for (const k in S.days) { const v = S.days[k]; totalSec += v.s || 0; totalRev += v.r || 0; if (k >= wk) weekSec += v.s || 0; }
-    const R = 32, C = 2 * Math.PI * R, frac = Math.min(1, t.n / goal);
+    const R = 40, C = 2 * Math.PI * R, frac = Math.min(1, t.n / goal);
     const ds = now.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' }), dateStr = ds.charAt(0).toUpperCase() + ds.slice(1);
     const newLeft = buildQueue(1).length;
-    const learnSub = pend ? words(pend) + ' ' + pl(pend, 'ждёт', 'ждут', 'ждут') + ' тренировки' : newLeft ? 'Сегодня ' + t.n + ' из ' + goal + ' новых' : 'В выбранных разделах всё пройдено';
+    const learnSub = pend ? words(pend) + ' ' + pl(pend, 'ждёт', 'ждут', 'ждут') + ' тренировки' : newLeft ? 'Сегодня ' + t.n + ' из ' + goal + ' новых слов' : 'Отметьте другие разделы в словаре.';
     const reviewSub = due ? words(due) + ' на повторение' : nd < Infinity ? 'Следующее повторение ' + relTime(nd) : 'Пока нечего повторять';
 
+    const firstName = (SEC.get(S.sel[0]) || {}).name || '';
+    const art = ['📚', '✈️', '🍎'];
     $('#view-home').innerHTML = installHTML() +
-      '<header class="top"><div class="brand">Word<i>eck</i></div><div class="date">' + esc(dateStr) + '</div></header>' +
-      '<button class="sec-chip" data-act="pick"><span class="lbl">Учу из</span><span class="val">' + esc(selLabel()) + '</span>' + I.chev + '</button>' +
-      '<div class="actions">' +
-        '<button class="act act-learn" data-act="learn"><span class="act-t">Учить слова</span><span class="act-s">' + esc(learnSub) + '</span><span class="act-ico">' + I.arrow + '</span></button>' +
-        '<button class="act act-review' + (due ? ' has-due' : '') + '" data-act="review"' + (due ? '' : ' aria-disabled="true"') + '><span class="act-t">Повторять слова</span><span class="act-s">' + esc(reviewSub) + '</span><span class="act-ico">' + (due ? (due > 99 ? '99+' : due) : I.repeat) + '</span></button>' +
+      '<header class="page-head"><div class="eyebrow">' + esc(dateStr) + '</div><h1 class="large">Сегодня</h1></header>' +
+      '<button class="hero" data-act="learn">' +
+        '<span class="hero-eyebrow">Новые слова</span>' +
+        '<span class="hero-title">' + (pend ? 'Пора<br>тренироваться.' : newLeft ? 'Учите новое.<br>Каждый день.' : 'Всё пройдено.') + '</span>' +
+        '<span class="hero-sub">' + esc(learnSub) + '</span>' +
+        '<span class="pill pill-light">' + (pend ? 'Тренировать' : 'Начать') + I.arrow + '</span>' +
+        '<span class="hero-art" aria-hidden="true">' + art.map(e => '<i>' + e + '</i>').join('') + '</span>' +
+      '</button>' +
+      '<div class="duo">' +
+        '<button class="card-btn' + (due ? '' : ' idle') + '" data-act="review"><span class="t-eyebrow">Повторение</span><span class="t-num">' + (due > 999 ? '999+' : due) + '</span>' +
+          '<span class="t-sub">' + esc(due ? pl(due, 'слово ждёт', 'слова ждут', 'слов ждут') : (nd < Infinity ? 'Следующее ' + relTime(nd) : 'Пока нечего повторять')) + '</span>' +
+          (due ? '<span class="pill pill-blue">Повторить</span>' : '') + '</button>' +
+        '<button class="card-btn src" data-act="pick"><span class="t-eyebrow">Учу из</span><span class="t-val">' + esc(selLabel()) + '</span><span class="t-sub">Разделы' + I.chev + '</span></button>' +
       '</div>' +
-      '<div class="h2">Аналитика</div>' +
+      '<h2 class="section-h">Активность</h2>' +
       '<div class="panel goal">' +
-        '<svg class="ring" viewBox="0 0 76 76" aria-hidden="true"><circle class="bgc" cx="38" cy="38" r="' + R + '"/><circle class="fg" cx="38" cy="38" r="' + R + '" stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="' + (C * (1 - frac)).toFixed(1) + '" transform="rotate(-90 38 38)"/><text x="38" y="44" text-anchor="middle">' + Math.round(frac * 100) + '%</text></svg>' +
-        '<div class="goal-txt"><b>Цель дня: ' + t.n + ' из ' + words(goal) + '</b><span>' + (t.r ? 'Повторено сегодня: ' + t.r : 'Сегодня ещё не было повторений') + '</span>' +
-        '<span class="streak' + (st.today ? ' on' : '') + '"><i></i>Серия: ' + st.n + ' ' + pl(st.n, 'день', 'дня', 'дней') + ' подряд</span></div>' +
+        '<svg class="ring" viewBox="0 0 96 96" aria-hidden="true"><defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5AC8FA"/><stop offset="1" stop-color="#0A84FF"/></linearGradient></defs>' +
+          '<circle class="bgc" cx="48" cy="48" r="' + R + '"/><circle class="fg" cx="48" cy="48" r="' + R + '" stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="' + (C * (1 - frac)).toFixed(1) + '" transform="rotate(-90 48 48)"/></svg>' +
+        '<div class="goal-txt"><span class="lbl">Цель дня</span><span class="big">' + t.n + '<small> / ' + goal + ' слов</small></span>' +
+        '<span class="sub">' + (st.n ? '🔥 ' + st.n + ' ' + pl(st.n, 'день', 'дня', 'дней') + ' подряд' : 'Начните серию сегодня') + (t.r ? ' · повторено ' + t.r : '') + '</span></div>' +
       '</div>' +
       '<div class="tiles">' +
-        '<div class="tile"><b>' + fmtN(c.l + c.n) + '</b><span><i class="c-learn"></i>Изучаю</span></div>' +
-        '<div class="tile"><b>' + fmtN(c.d) + '</b><span><i class="c-done"></i>Выучено</span></div>' +
-        '<div class="tile"><b>' + fmtN(c.k) + '</b><span><i class="c-known"></i>Уже знал</span></div>' +
-        '<div class="tile"><b>' + fmtN(totalRev) + '</b><span>Повторений всего</span></div>' +
+        '<div class="tile"><span class="lbl l-blue"><i></i>Изучаю</span><b>' + fmtN(c.l + c.n) + '<small>сл.</small></b></div>' +
+        '<div class="tile"><span class="lbl l-green"><i></i>Выучено</span><b>' + fmtN(c.d) + '<small>сл.</small></b></div>' +
+        '<div class="tile"><span class="lbl l-orange"><i></i>Уже знал</span><b>' + fmtN(c.k) + '<small>сл.</small></b></div>' +
+        '<div class="tile"><span class="lbl l-purple"><i></i>Повторений</span><b>' + fmtN(totalRev) + '</b></div>' +
       '</div>' +
-      '<div class="panel"><div class="panel-h">Время занятий</div><div class="times">' +
+      '<div class="panel"><div class="panel-h"><b>Время занятий</b></div><div class="times">' +
         '<div><b>' + fmtTime(t.s) + '</b><span>Сегодня</span></div>' +
         '<div><b>' + fmtTime(weekSec) + '</b><span>За 7 дней</span></div>' +
-        '<div><b>' + fmtTime(totalSec) + '</b><span>За всё время</span></div>' +
+        '<div><b>' + fmtTime(totalSec) + '</b><span>Всего</span></div>' +
       '</div></div>' +
-      '<div class="panel"><div class="panel-h">Активность за 14 дней<small>новые + повторения</small></div><div class="chart" id="chart">' + chartSVG() + '</div></div>' +
-      '<div class="panel"><div class="panel-h">Уровни Oxford</div>' + levelsHTML() + '</div>' +
-      '<div class="panel"><div class="panel-h">Выбранные разделы</div><div class="sp-rows">' + S.sel.map(id => {
+      '<div class="panel"><div class="panel-h"><b>14 дней</b><small>новые и повторения</small></div><div class="chart" id="chart">' + chartSVG() + '</div></div>' +
+      '<div class="panel"><div class="panel-h"><b>Уровни Oxford</b></div>' + levelsHTML() + '</div>' +
+      '<div class="panel"><div class="panel-h"><b>Выбранные разделы</b></div><div class="sp-rows">' + S.sel.map(id => {
         const s = SEC.get(id); if (!s) return '';
         const done = s.list.reduce((a, x) => a + (S.words[x.w] ? 1 : 0), 0);
         return '<div class="sp-row"><div><span>' + esc(s.name) + '</span><em>' + fmtN(done) + ' / ' + fmtN(s.list.length) + '</em></div><div class="pbar"><i style="width:' + (100 * done / Math.max(1, s.list.length)).toFixed(1) + '%"></i></div></div>';
@@ -380,8 +366,8 @@
         '<div class="chips">' + FILTERS.map(([k, n]) => '<button class="chip" data-filter="' + k + '" aria-pressed="' + (D.filter === k) + '">' + n + '</button>').join('') + '</div>' +
         '<div id="dict-body"></div>';
     } else {
-      v.innerHTML = '<header class="top"><div class="brand">Словарь</div><div class="cnt">' + fmtN(W.length) + ' слов</div></header>' +
-        '<div class="search">' + I.search + '<input id="dict-q" type="search" placeholder="Поиск по-английски или по-русски" autocomplete="off" value="' + esc(D.q) + '"></div>' +
+      v.innerHTML = '<header class="page-head"><div class="row"><h1 class="large">Словарь</h1><span class="cnt">' + fmtN(W.length) + ' слов</span></div></header>' +
+        '<div class="search">' + I.search + '<input id="dict-q" type="search" placeholder="Поиск" autocomplete="off" value="' + esc(D.q) + '"></div>' +
         '<div id="dict-body"></div>';
     }
     renderDictBody();
@@ -434,10 +420,10 @@
   function bodyHTML(x, o) {
     o = o || {};
     const lists = [x.ngsl ? 'NGSL #' + x.ngsl : '', x.ox === 3 ? 'Oxford 3000' : x.ox === 5 ? 'Oxford 5000' : ''].filter(Boolean);
-    let h = '<div class="card-body"><div class="meta">' + (x.cefr ? '<span class="tag lv">' + x.cefr + '</span>' : '') + (x.pos.length ? '<span class="tag">' + esc(posLabel(x)) + '</span>' : '') + (o.lists ? lists.map(l => '<span class="tag">' + l + '</span>').join('') : '') + '</div>' +
+    let h = '<div class="info"><div class="tags">' + (x.cefr ? '<span class="tag lv">' + x.cefr + '</span>' : '') + (x.pos.length ? '<span class="tag">' + esc(posLabel(x)) + '</span>' : '') + (o.lists ? lists.map(l => '<span class="tag">' + l + '</span>').join('') : '') + '</div>' +
       '<h2 class="word">' + esc(x.w) + '</h2>' +
       '<div class="ipa-row"><button class="spk" data-act="speak" aria-label="Произнести">' + I.spk + '</button><span>' + esc(x.ipa || '') + '</span></div>';
-    if (o.hideRu) h += '<div class="ru hide" data-act="reveal">Нажмите, чтобы увидеть перевод</div>';
+    if (o.hideRu) h += '<div class="ru hide" data-act="reveal">Показать перевод</div>';
     else if (o.ru !== false) h += '<div class="ru">' + esc(x.ru) + '</div>';
     if (o.def && x.def) h += '<p class="def">' + esc(x.def) + '</p>';
     if (o.ex !== false && x.ex) h += '<p class="ex"><button data-act="speak-ex" aria-label="Произнести пример">' + I.spk + '</button><span>' + esc(x.ex) + '</span></p>';
@@ -447,7 +433,7 @@
   function openWord(x) {
     sheetWord = x;
     const s = status(x.w);
-    const h = '<div class="grab"></div><div class="wsheet"><div class="qcard">' + picHTML(x) + bodyHTML(x, { def: true, lists: true }) + '</div></div>' +
+    const h = '<div class="grab"></div><div class="wsheet"><div class="qcard k-' + mediaKind(x) + '">' + mediaHTML(x) + bodyHTML(x, { def: true, lists: true }) + '</div></div>' +
       '<div class="status-line"><span class="dot ' + s + '"></span>' + esc(statusText(x)) + '</div>' +
       '<div class="row2">' +
         (s === 'n' || s === 'l' ? '' : '<button class="btn btn-main" data-act="w-learn">Учить</button>') +
@@ -455,7 +441,7 @@
         (s ? '<button class="btn btn-soft" data-act="w-reset">Сбросить</button>' : '') +
       '</div>';
     openSheet(h, 'word');
-    fillPics($('#sheet'));
+    bindMedia($('#sheet'));
     if (S.set.autoplay) speak(x);
   }
 
@@ -466,7 +452,7 @@
   function renderSettings() {
     const vs = voices.length ? voices.map(v => '<option value="' + esc(v.voiceURI) + '"' + (v.voiceURI === S.set.ttsVoice ? ' selected' : '') + '>' + esc(v.name + ' (' + v.lang + ')') + '</option>').join('') : '<option value="">Голоса не найдены</option>';
     $('#view-settings').innerHTML =
-      '<header class="top"><div class="brand">Настройки</div></header>' +
+      '<header class="page-head"><h1 class="large">Настройки</h1></header>' +
       '<div class="set-group"><div class="h2">Оформление</div><div class="set">' +
         '<div class="set-row col"><span class="lab">Тема</span>' + seg('theme', [['system', 'Как в системе'], ['light', 'Светлая'], ['dark', 'Тёмная']]) + '</div>' +
       '</div></div>' +
@@ -481,7 +467,7 @@
         '<div class="set-row col"><span class="lab">Цель: новых слов в день</span>' + seg('goal', [[5, '5'], [10, '10'], [15, '15'], [20, '20'], [30, '30']]) + '</div>' +
         '<div class="set-row col"><span class="lab">Слов в одной тренировке</span>' + seg('batch', [[3, '3'], [5, '5'], [7, '7'], [10, '10']]) + '</div>' +
         '<div class="set-row"><label for="set-showRu">Показывать перевод на новой карточке</label>' + sw('showRu') + '</div>' +
-        '<div class="set-row"><label for="set-images">Картинки к словам</label>' + sw('images') + '<span class="note">Картинки загружаются из интернета (Openverse, Wikipedia).</span></div>' +
+        '<div class="set-row col"><span class="lab">Картинки</span>' + seg('images', [['all', 'Фото и эмодзи'], ['emoji', 'Эмодзи'], ['off', 'Без картинок']]) + '<span class="note">Фото проверены вручную и подобраны по смыслу слова. Нажмите на картинку в карточке, чтобы переключить фото и эмодзи.</span></div>' +
       '</div></div>' +
       '<div class="set-group"><div class="h2">Прогресс</div><div class="set">' +
         '<div class="set-row"><span class="lab">Сохранить копию прогресса</span><button class="btn btn-soft" data-act="export">Скачать файл</button></div>' +
@@ -489,7 +475,7 @@
         '<div class="set-row"><span class="lab">Удалить весь прогресс</span><button class="btn btn-danger" data-act="reset">' + (resetArm > Date.now() ? 'Нажмите ещё раз' : 'Сбросить') + '</button></div>' +
       '</div></div>' +
       '<div class="about"><p>Прогресс хранится только в этом браузере. Чтобы перенести его на другое устройство, скачайте файл и загрузите его там.</p>' +
-      '<p>Списки слов: New General Service List 1.2 (Browne, Culligan, Phillips; CC BY-SA 4.0), Oxford 3000 и Oxford 5000 (Oxford University Press). Произношение: Oxford Learner\'s Dictionaries. Картинки: Openverse и Wikipedia.</p></div>';
+      '<p>Списки слов: New General Service List 1.2 (Browne, Culligan, Phillips; CC BY-SA 4.0), Oxford 3000 и Oxford 5000 (Oxford University Press). Произношение: Oxford Learner\'s Dictionaries. Фото: Wikimedia Commons через Wikidata.</p></div>';
   }
 
   // ---------------------------------------------------------------- overlay sessions
@@ -544,12 +530,13 @@
   }
   function cardHTML(x, cls, o) {
     o = o || {};
-    return '<article class="card ' + cls + '" data-w="' + esc(x.w) + '">' + picHTML(x) + bodyHTML(x, o) +
+    const kind = mediaKind(x);
+    return '<article class="card ' + cls + ' k-' + kind + '" data-w="' + esc(x.w) + '">' + mediaHTML(x, kind) + bodyHTML(x, o) +
       '<div class="stamp left' + (o.leftBad ? ' bad' : '') + '">' + (o.leftLabel || 'Знаю') + '</div><div class="stamp right">' + (o.rightLabel || 'Учить') + '</div></article>';
   }
   function cardTap(target, x) {
-    const pic = target && target.closest && target.closest('.pic');
-    if (pic) { nextPic(pic); return; }
+    const m = target && target.closest && target.closest('.media');
+    if (m && m.dataset.both) { toggleMedia(m); return; }
     const hid = $('.card.is-top .ru.hide', ov);
     if (hid) { reveal(); return; }
     speak(x);
@@ -572,17 +559,17 @@
     let dots = ''; for (let i = 0; i < B; i++) dots += '<i class="' + (i < pend ? 'on' : '') + '"></i>';
     ov.innerHTML = '<div class="ses">' +
       '<header class="ses-top"><button class="icon-btn" data-act="close" aria-label="Закрыть">' + I.close + '</button>' +
-        '<div class="ses-mid"><div class="ses-title">Новые слова · к изучению ' + Math.min(pend, B) + ' из ' + B + '</div><div class="dots">' + dots + '</div></div>' +
+        '<div class="ses-mid"><div class="ses-title">К изучению ' + Math.min(pend, B) + ' из ' + B + '</div><div class="dots">' + dots + '</div></div>' +
         '<button class="icon-btn" data-act="undo" aria-label="Вернуть прошлую карточку"' + (L.hist.length ? '' : ' disabled') + '>' + I.undo + '</button></header>' +
-      '<div class="stack">' + (cur ? (nxt ? cardHTML(nxt, 'is-under', { hideRu: !S.set.showRu }) : '') + cardHTML(cur, 'is-top enter', { hideRu: !S.set.showRu }) : '<div class="done"><h2>Новые слова закончились</h2><p>Отметьте другие разделы на главном экране.</p></div>') + '</div>' +
+      '<div class="stack">' + (cur ? (nxt ? cardHTML(nxt, 'is-under', { hideRu: !S.set.showRu }) : '') + cardHTML(cur, 'is-top enter', { hideRu: !S.set.showRu }) : '<div class="done"><div class="done-ico">🎉</div><h2>Новые слова закончились</h2><p>Отметьте другие разделы в словаре.</p></div>') + '</div>' +
       '<div class="ses-actions"><button class="big-btn known" data-act="known"' + (cur ? '' : ' disabled') + '>' + I.left + 'Знаю</button><button class="round-btn" data-act="speak" aria-label="Произнести">' + I.spk + '</button><button class="big-btn learn" data-act="tolearn"' + (cur ? '' : ' disabled') + '>Учить' + I.arrow + '</button></div>' +
       '<div class="ses-foot">' + (pend ? '<button class="link-btn" data-act="train">Начать тренировку сейчас (' + pend + ')</button>' : 'Влево - уже знаю слово, вправо - начну его учить') + '</div>' +
       '</div>';
     if (!cur) return;
     const top = $('.card.is-top', ov);
     swipe = makeSwipe(top, decideLearn, t => cardTap(t, cur));
-    fillPics(ov);
-    prefetch(L.q.slice(2, 5));
+    bindMedia(ov);
+    prefetch(L.q.slice(1, 5));
     if (S.set.autoplay) speak(cur);
   }
   function decideLearn(dir) {
@@ -634,15 +621,15 @@
     T.lock = false; T.cur = s;
     let h = '';
     if (s.k === 'intro') {
-      h = '<div class="lead">Новое слово · ' + (T.i + 1) + ' из ' + T.list.length + '</div><div class="qcard intro">' + picHTML(x) + bodyHTML(x, { def: true }) + '</div>' +
+      h = '<div class="lead">Новое слово · ' + (T.i + 1) + ' из ' + T.list.length + '</div><div class="qcard intro k-' + mediaKind(x) + '">' + mediaHTML(x) + bodyHTML(x, { def: true }) + '</div>' +
         '<button class="btn btn-main btn-wide" data-act="next">Запомнил, дальше</button>';
     } else if (s.k === 'ru') {
       s.opts = shuffle([x, ...distractors(x, 'ru', 3, T.list)]);
-      h = '<div class="lead">Выберите перевод</div><div class="qcard">' + picHTML(x) + bodyHTML(x, { ru: false, ex: false }) + '</div>' +
+      h = '<div class="lead">Выберите перевод</div><div class="qcard k-' + mediaKind(x) + '">' + mediaHTML(x) + bodyHTML(x, { ru: false, ex: false }) + '</div>' +
         '<div class="opts">' + s.opts.map((o, j) => '<button class="opt" data-opt="' + j + '">' + esc(o.ru) + '</button>').join('') + '</div><div class="feedback"></div>';
     } else if (s.k === 'en') {
       s.opts = shuffle([x, ...distractors(x, 'w', 3, T.list)]);
-      h = '<div class="lead">Выберите слово</div><div class="qcard"><div class="card-body"><div class="meta">' + (x.pos.length ? '<span class="tag">' + esc(posLabel(x)) + '</span>' : '') + '</div><div class="q-ru">' + esc(x.ru) + '</div></div></div>' +
+      h = '<div class="lead">Выберите слово</div><div class="qcard">' + (mediaKind(x) !== 'type' ? mediaHTML(x) : '') + '<div class="info"><div class="tags">' + (x.pos.length ? '<span class="tag">' + esc(posLabel(x)) + '</span>' : '') + '</div><div class="q-ru">' + esc(x.ru) + '</div></div></div>' +
         '<div class="opts">' + s.opts.map((o, j) => '<button class="opt en" data-opt="' + j + '">' + esc(o.w) + '</button>').join('') + '</div><div class="feedback"></div>';
     } else if (s.k === 'listen') {
       s.opts = shuffle([x, ...distractors(x, 'w', 3, T.list)]);
@@ -652,12 +639,12 @@
       const ans = x.w.toLowerCase();
       s.sp = { ans, pos: 0, err: false, letters: shuffle(ans.split('').map((c, j) => ({ c, j }))) };
       let slots = ''; for (let j = 0; j < ans.length; j++) slots += '<span class="slot"></span>';
-      h = '<div class="lead">Соберите слово</div><div class="qcard">' + picHTML(x) + '<div class="card-body"><div class="q-ru">' + esc(x.ru) + '</div></div></div>' +
+      h = '<div class="lead">Соберите слово</div><div class="qcard">' + (mediaKind(x) !== 'type' ? mediaHTML(x) : '') + '<div class="info"><div class="q-ru">' + esc(x.ru) + '</div></div></div>' +
         '<div class="slots">' + slots + '</div><div class="tiles-l">' + s.sp.letters.map((l, j) => '<button class="ltile" data-tile="' + j + '">' + esc(l.c) + '</button>').join('') + '</div>' +
         '<div class="feedback"></div><div class="row2"><button class="btn btn-soft" data-act="hint">Подсказка</button><button class="btn btn-soft" data-act="giveup">Не помню</button></div>';
     }
     ov.innerHTML = trainFrame(h);
-    fillPics(ov);
+    bindMedia(ov);
     if (S.set.autoplay && (s.k === 'intro' || s.k === 'ru')) speak(x);
     if (s.k === 'listen') speak(x);
   }
@@ -722,7 +709,7 @@
     d.n += T.list.length; save();
     const list = T.list, wrong = T.wrong;
     mode = 'done';
-    ov.innerHTML = '<div class="ses"><div class="done"><h2>Готово! +' + words(list.length) + '</h2>' +
+    ov.innerHTML = '<div class="ses"><div class="done"><div class="done-ico">🎉</div><h2>Готово!<br>+' + words(list.length) + '</h2>' +
       '<p>' + (wrong ? 'Ошибок: ' + wrong + '. ' : 'Без единой ошибки. ') + 'Первое повторение ' + relTime(now + INTERVALS[0]) + '.</p>' +
       '<div class="list">' + list.map(wordRow).join('') + '</div>' +
       '<div class="btns"><button class="btn btn-main" data-act="again-learn">Учить ещё</button><button class="btn btn-soft" data-act="close">На главную</button></div></div></div>';
@@ -747,7 +734,7 @@
       '<div class="ses-actions"><button class="big-btn bad" data-act="forgot">' + I.left + 'Не помню</button><button class="round-btn" data-act="speak" aria-label="Произнести">' + I.spk + '</button><button class="big-btn learn" data-act="remember">Помню' + I.arrow + '</button></div>' +
       '<div class="ses-foot">Вспомните перевод, затем откройте его и смахните карточку</div></div>';
     swipe = makeSwipe($('.card.is-top', ov), decideReview, t => cardTap(t, cur));
-    fillPics(ov);
+    bindMedia(ov);
     prefetch(R.q.slice(1, 4));
     if (S.set.autoplay) speak(cur);
   }
@@ -778,7 +765,7 @@
   function finishReview() {
     save(); mode = 'done';
     const nd = nextDue();
-    ov.innerHTML = '<div class="ses"><div class="done"><h2>Повторение завершено</h2>' +
+    ov.innerHTML = '<div class="ses"><div class="done"><div class="done-ico">' + (R.bad ? '💪' : '🏆') + '</div><h2>Повторение завершено</h2>' +
       '<p>Помню: ' + R.ok + ' · Не помню: ' + R.bad + '. ' + (nd < Infinity ? 'Следующее повторение ' + relTime(nd) + '.' : '') + '</p>' +
       '<div class="btns"><button class="btn btn-main" data-act="close">На главную</button></div></div></div>';
     R = null;
@@ -845,8 +832,8 @@
   });
   // pictures inside sheets / training cards: tap for another picture
   document.addEventListener('click', e => {
-    const pic = e.target.closest('.pic');
-    if (pic && !pic.closest('.card')) nextPic(pic);
+    const m = e.target.closest('.media');
+    if (m && !m.closest('.card')) toggleMedia(m);
   });
   document.addEventListener('change', e => {
     const t = e.target;

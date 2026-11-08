@@ -1,6 +1,6 @@
 // Wordeck service worker: keeps the app working offline.
 // Bump VERSION after changing any app file so phones pick up the update.
-const VERSION = 'wordeck-2026-11-08-2';
+const VERSION = 'wordeck-2026-11-08-3';
 const CORE = ['./', './index.html', './style.css', './app.js', './words.js', './manifest.webmanifest',
   './apple-touch-icon.png', './icon-192.png', './icon-512.png', './icon-maskable.png'];
 const FONTS = 'wordeck-fonts';
