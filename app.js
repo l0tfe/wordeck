@@ -11,7 +11,7 @@
   const TOPICS = [['f', 'Еда и напитки'], ['a', 'Животные'], ['n', 'Природа и погода'], ['b', 'Тело и здоровье'], ['h', 'Дом и быт'], ['c', 'Одежда и внешность'], ['p', 'Люди и семья'], ['m', 'Чувства и характер'], ['t', 'Путешествия и транспорт'], ['l', 'Город и места'], ['w', 'Работа и бизнес'], ['$', 'Деньги и покупки'], ['e', 'Учёба и наука'], ['i', 'Технологии'], ['r', 'Искусство и медиа'], ['s', 'Спорт и досуг'], ['g', 'Общество и право'], ['d', 'Время и числа']];
   const LEVELS = [['A1', 'Начальный'], ['A2', 'Элементарный'], ['B1', 'Средний'], ['B2', 'Выше среднего'], ['C1', 'Продвинутый']];
   const CR = { A1: 1, A2: 2, B1: 3, B2: 4, C1: 5 };
-  const DEF_SET = { theme: 'system', voice: 'uk', ttsVoice: '', rate: 1, autoplay: true, showRu: true, goal: 10, batch: 5, images: 'all' };
+  const DEF_SET = { theme: 'system', voice: 'uk', ttsVoice: '', rate: 1, autoplay: true, showRu: true, goal: 10, batch: 10, images: 'all' };
 
   const I = {
     close: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
@@ -23,6 +23,9 @@
     back: '<svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>',
     search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>',
     check: '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    kbd: '<svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6.5 10h.01M9.5 10h.01M12.5 10h.01M15.5 10h.01M18 10h.01M7.5 14h9"/></svg>',
+    eye: '<svg viewBox="0 0 24 24"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+    grid: '<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="7.5" height="5.5" rx="2"/><rect x="13" y="5" width="7.5" height="5.5" rx="2"/><rect x="3.5" y="13.5" width="7.5" height="5.5" rx="2"/><rect x="13" y="13.5" width="7.5" height="5.5" rx="2"/></svg>',
     repeat: '<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 9"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 15"/><path d="M4 20v-5h5"/></svg>'
   };
 
@@ -228,7 +231,7 @@
     const R = 40, C = 2 * Math.PI * R, frac = Math.min(1, t.n / goal);
     const ds = now.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' }), dateStr = ds.charAt(0).toUpperCase() + ds.slice(1);
     const newLeft = buildQueue(1).length;
-    const learnSub = pend ? words(pend) + ' ' + pl(pend, 'ждёт', 'ждут', 'ждут') + ' тренировки' : newLeft ? 'Сегодня ' + t.n + ' из ' + goal + ' новых слов' : 'Отметьте другие разделы в словаре.';
+    const learnSub = pend ? 'Изучаю ' + words(pend) + '. Сегодня выучено ' + t.n + ' из ' + goal : newLeft ? 'Сегодня ' + t.n + ' из ' + goal + ' новых слов' : 'Отметьте другие разделы в словаре.';
     const reviewSub = due ? words(due) + ' на повторение' : nd < Infinity ? 'Следующее повторение ' + relTime(nd) : 'Пока нечего повторять';
 
     const firstName = (SEC.get(S.sel[0]) || {}).name || '';
@@ -237,9 +240,9 @@
       '<header class="page-head"><div class="eyebrow">' + esc(dateStr) + '</div><h1 class="large">Сегодня</h1></header>' +
       '<button class="hero" data-act="learn">' +
         '<span class="hero-eyebrow">Новые слова</span>' +
-        '<span class="hero-title">' + (pend ? 'Пора<br>тренироваться.' : newLeft ? 'Учите новое.<br>Каждый день.' : 'Всё пройдено.') + '</span>' +
+        '<span class="hero-title">' + (pend ? 'Продолжим.<br>Слова ждут.' : newLeft ? 'Учите новое.<br>Каждый день.' : 'Всё пройдено.') + '</span>' +
         '<span class="hero-sub">' + esc(learnSub) + '</span>' +
-        '<span class="pill pill-light">' + (pend ? 'Тренировать' : 'Начать') + I.arrow + '</span>' +
+        '<span class="pill pill-light">' + (pend ? 'Продолжить' : 'Начать') + I.arrow + '</span>' +
         '<span class="hero-art" aria-hidden="true">' + art.map(e => '<i>' + e + '</i>').join('') + '</span>' +
       '</button>' +
       '<div class="duo">' +
@@ -413,7 +416,7 @@
     const v = S.words[x.w];
     if (!v) return 'Новое слово';
     if (v.s === 'k') return 'Уже знал';
-    if (v.s === 'n') return 'Ждёт тренировки';
+    if (v.s === 'n') return 'Изучаю · ещё не отложено для повторения';
     if (v.s === 'd') return 'Выучено';
     return 'Изучаю · этап ' + ((v.st || 0) + 1) + ' из ' + INTERVALS.length + ' · повторение ' + relTime(v.due);
   }
@@ -465,7 +468,7 @@
       '</div></div>' +
       '<div class="set-group"><div class="h2">Обучение</div><div class="set">' +
         '<div class="set-row col"><span class="lab">Цель: новых слов в день</span>' + seg('goal', [[5, '5'], [10, '10'], [15, '15'], [20, '20'], [30, '30']]) + '</div>' +
-        '<div class="set-row col"><span class="lab">Слов в одной тренировке</span>' + seg('batch', [[3, '3'], [5, '5'], [7, '7'], [10, '10']]) + '</div>' +
+        '<div class="set-row col"><span class="lab">Сколько слов учить одновременно</span>' + seg('batch', [[5, '5'], [10, '10'], [15, '15'], [20, '20']]) + '<span class="note">Пока столько слов в изучении, новые не добавляются - сначала отложите выученные.</span></div>' +
         '<div class="set-row"><label for="set-showRu">Показывать перевод на новой карточке</label>' + sw('showRu') + '</div>' +
         '<div class="set-row col"><span class="lab">Картинки</span>' + seg('images', [['all', 'Фото и эмодзи'], ['emoji', 'Эмодзи'], ['off', 'Без картинок']]) + '<span class="note">Фото проверены вручную и подобраны по смыслу слова. Нажмите на картинку в карточке, чтобы переключить фото и эмодзи.</span></div>' +
       '</div></div>' +
@@ -531,7 +534,7 @@
   function cardHTML(x, cls, o) {
     o = o || {};
     const kind = mediaKind(x);
-    return '<article class="card ' + cls + ' k-' + kind + '" data-w="' + esc(x.w) + '">' + mediaHTML(x, kind) + bodyHTML(x, o) +
+    return '<article class="card ' + cls + ' k-' + kind + '" data-w="' + esc(x.w) + '">' + (o.badge ? '<div class="nc-badge">' + o.badge + '</div>' : '') + mediaHTML(x, kind) + bodyHTML(x, o) +
       '<div class="stamp left' + (o.leftBad ? ' bad' : '') + '">' + (o.leftLabel || 'Знаю') + '</div><div class="stamp right">' + (o.rightLabel || 'Учить') + '</div></article>';
   }
   function cardTap(target, x) {
@@ -542,57 +545,179 @@
     speak(x);
   }
 
-  // ---- learn new words
+  // ---- learn: new words and words in progress, mixed in one deck
+  // A word swiped right gets status 'n' (in progress). It comes back a few cards later in Russian,
+  // until the user presses "Запомнил, отложить" - then it moves to timed review (status 'l').
   function startLearn() {
-    const pend = pendingList();
-    if (pend.length >= S.set.batch) { startTraining(pend.slice(0, S.set.batch)); return; }
-    const q = buildQueue(60);
-    if (!q.length) {
-      if (pend.length) { startTraining(pend); return; }
+    const q = buildQueue(80), pool = pendingList();
+    if (!q.length && !pool.length) {
       toast('В отмеченных разделах не осталось новых слов. Отметьте другие разделы в словаре.'); D.sec = null; showTab('dict'); return;
     }
-    L = { q, hist: [] }; openOverlay('learn'); renderLearn();
+    L = { q, next: {}, tick: 0, last: '', lastW: '', hist: [], cur: null, lc: null };
+    pool.forEach((x, i) => { L.next[x.w] = i; });
+    openOverlay('learn'); nextLearn();
   }
-  function renderLearn() {
-    const pend = pendingList().length, B = S.set.batch;
-    const cur = L.q[0], nxt = L.q[1];
-    let dots = ''; for (let i = 0; i < B; i++) dots += '<i class="' + (i < pend ? 'on' : '') + '"></i>';
-    ov.innerHTML = '<div class="ses">' +
-      '<header class="ses-top"><button class="icon-btn" data-act="close" aria-label="Закрыть">' + I.close + '</button>' +
-        '<div class="ses-mid"><div class="ses-title">К изучению ' + Math.min(pend, B) + ' из ' + B + '</div><div class="dots">' + dots + '</div></div>' +
-        '<button class="icon-btn" data-act="undo" aria-label="Вернуть прошлую карточку"' + (L.hist.length ? '' : ' disabled') + '>' + I.undo + '</button></header>' +
-      '<div class="stack">' + (cur ? (nxt ? cardHTML(nxt, 'is-under', { hideRu: !S.set.showRu }) : '') + cardHTML(cur, 'is-top enter', { hideRu: !S.set.showRu }) : '<div class="done"><div class="done-ico">🎉</div><h2>Новые слова закончились</h2><p>Отметьте другие разделы в словаре.</p></div>') + '</div>' +
-      '<div class="ses-actions"><button class="big-btn known" data-act="known"' + (cur ? '' : ' disabled') + '>' + I.left + 'Знаю</button><button class="round-btn" data-act="speak" aria-label="Произнести">' + I.spk + '</button><button class="big-btn learn" data-act="tolearn"' + (cur ? '' : ' disabled') + '>Учить' + I.arrow + '</button></div>' +
-      '<div class="ses-foot">' + (pend ? '<button class="link-btn" data-act="train">Начать тренировку сейчас (' + pend + ')</button>' : 'Влево - уже знаю слово, вправо - начну его учить') + '</div>' +
-      '</div>';
-    if (!cur) return;
-    const top = $('.card.is-top', ov);
-    swipe = makeSwipe(top, decideLearn, t => cardTap(t, cur));
-    bindMedia(ov);
-    prefetch(L.q.slice(1, 5));
-    if (S.set.autoplay) speak(cur);
+  function pickLearn() {
+    const pool = pendingList();
+    const nx = x => L.next[x.w] || 0;
+    const others = pool.filter(x => x.w !== L.lastW).sort((a, b) => nx(a) - nx(b));
+    const ready = others.filter(x => nx(x) <= L.tick);
+    const canNew = L.q.length > 0 && pool.length < S.set.batch;
+    if (ready.length && (L.last === 'new' || !canNew)) return { type: 'learn', x: ready[0] };
+    if (canNew) return { type: 'new', x: L.q[0] };
+    if (others.length) return { type: 'learn', x: others[0] };
+    if (pool.length) return { type: 'learn', x: pool[0] };
+    return null;
   }
-  function decideLearn(dir) {
+  function nextLearn() {
     if (!L) return;
-    const x = L.q.shift(); if (!x) return;
-    const k = dayKey();
-    if (dir < 0) { S.words[x.w] = { s: 'k', t: Date.now() }; day(k).k++; } else S.words[x.w] = { s: 'n', t: Date.now() };
-    L.hist.push({ x, dir, k }); if (L.hist.length > 30) L.hist.shift();
-    saveSoon();
-    const pend = pendingList();
-    if (dir > 0 && pend.length >= S.set.batch) { startTraining(pend.slice(0, S.set.batch)); return; }
     if (L.q.length < 6) { const have = new Set(L.q.map(y => y.w)); L.q.push(...buildQueue(40, have)); }
+    L.cur = pickLearn();
     renderLearn();
   }
-  function undoLearn() {
-    const h = L && L.hist.pop(); if (!h) return;
-    const v = S.words[h.x.w];
-    if (v && (v.s === 'k' || v.s === 'n')) { delete S.words[h.x.w]; if (h.dir < 0) { const d = day(h.k); d.k = Math.max(0, d.k - 1); } }
-    L.q.unshift(h.x); saveSoon(); renderLearn();
+  function learnHeader() {
+    const t = peekDay(dayKey()), goal = S.set.goal, pool = pendingList().length;
+    let bar = '';
+    if (goal <= 20) { for (let i = 0; i < goal; i++) bar += '<i class="' + (i < t.n ? 'on' : '') + '"></i>'; bar = '<div class="dots">' + bar + '</div>'; }
+    else bar = '<div class="progress"><i style="width:' + Math.min(100, 100 * t.n / goal).toFixed(1) + '%"></i></div>';
+    return '<header class="ses-top"><button class="icon-btn" data-act="close" aria-label="Закрыть">' + I.close + '</button>' +
+      '<div class="ses-mid"><div class="ses-title">Выучено ' + t.n + ' из ' + goal + (pool ? ' · изучаю ' + pool : '') + '</div>' + bar + '</div>' +
+      '<button class="icon-btn" data-act="undo" aria-label="Вернуть прошлую карточку"' + (L.hist.length ? '' : ' disabled') + '>' + I.undo + '</button></header>';
   }
-
-  // ---- training
-  const canSpell = x => /^[a-z]{2,12}$/i.test(x.w);
+  function renderLearn() {
+    const c = L.cur;
+    swipe = null;
+    if (!c) {
+      ov.innerHTML = '<div class="ses">' + learnHeader() + '<div class="done"><div class="done-ico">🎉</div><h2>На сегодня всё</h2><p>Новые слова в отмеченных разделах закончились. Отметьте другие разделы в словаре.</p><div class="btns"><button class="btn btn-main" data-act="close">На главную</button></div></div></div>';
+      return;
+    }
+    const x = c.x;
+    if (c.type === 'new') {
+      ov.innerHTML = '<div class="ses">' + learnHeader() +
+        '<div class="stack"><div class="card is-under ghost"></div>' + cardHTML(x, 'is-top enter', { hideRu: !S.set.showRu, badge: 'Новое слово' }) + '</div>' +
+        '<div class="ses-actions"><button class="big-btn known" data-act="known">' + I.left + 'Знаю</button><button class="round-btn" data-act="speak" aria-label="Произнести">' + I.spk + '</button><button class="big-btn learn" data-act="tolearn">Учить' + I.arrow + '</button></div>' +
+        '<div class="ses-foot">Влево - уже знаю слово, вправо - начну его учить</div></div>';
+      swipe = makeSwipe($('.card.is-top', ov), decideNew, t => cardTap(t, x));
+      bindMedia(ov); prefetch(L.q.slice(1, 4));
+      if (S.set.autoplay) speak(x);
+    } else {
+      L.lc = { x, mode: '', done: false, ok: null, opts: null };
+      ov.innerHTML = '<div class="ses">' + learnHeader() + '<div class="stack"><div class="card is-under ghost"></div>' + lcardHTML(x) + '</div></div>';
+      bindMedia(ov);
+    }
+  }
+  function decideNew(dir) {
+    if (!L || !L.cur || L.cur.type !== 'new') return;
+    const x = L.cur.x, k = dayKey();
+    L.q = L.q.filter(y => y !== x);
+    if (dir < 0) { S.words[x.w] = { s: 'k', t: Date.now() }; day(k).k++; }
+    else { S.words[x.w] = { s: 'n', t: Date.now() }; L.next[x.w] = L.tick + 3; }
+    L.hist.push({ x, dir, k }); if (L.hist.length > 30) L.hist.shift();
+    L.tick++; L.last = 'new'; L.lastW = x.w; saveSoon(); nextLearn();
+  }
+  function undoLearn() {
+    if (!L || !L.hist.length) return;
+    const h = L.hist[L.hist.length - 1], v = S.words[h.x.w];
+    if (v && v.s !== 'k' && v.s !== 'n') { L.hist.pop(); renderLearn(); return; }
+    L.hist.pop();
+    delete S.words[h.x.w]; delete L.next[h.x.w];
+    if (h.dir < 0) { const d = day(h.k); d.k = Math.max(0, d.k - 1); }
+    L.q = [h.x].concat(L.q.filter(y => y !== h.x)); L.cur = { type: 'new', x: h.x }; saveSoon(); renderLearn();
+  }
+  // ---- card for a word in progress: Russian prompt + write / look / choose
+  function srcLabel(x) {
+    const sc = S.sel.map(id => SEC.get(id)).find(sc => sc && sc.list.indexOf(x) >= 0);
+    return (sc ? sc.name : x.ox === 3 ? 'Oxford 3000' : x.ox === 5 ? 'Oxford 5000' : 'NGSL') + (x.cefr ? ' · ' + x.cefr : '');
+  }
+  function lcardHTML(x) {
+    const kind = mediaKind(x);
+    return '<article class="card lcard is-top enter" data-w="' + esc(x.w) + '">' +
+      '<div class="lc-scroll">' +
+        '<div class="lc-head"><span class="lc-badge"></span><span>Изучение слова</span></div>' +
+        '<div class="lc-src">' + esc(srcLabel(x)) + '</div>' +
+        (kind !== 'type' ? '<div class="lc-media">' + mediaHTML(x, kind) + '</div>' : '') +
+        '<div class="lc-ru">' + esc(x.ru) + '</div>' +
+        '<div class="lc-zone">' + lcZone() + '</div>' +
+      '</div>' +
+      '<div class="lc-foot"><button class="lc-btn" data-act="lc-later">Запомнил, отложить для повторения</button><span class="lc-sep"></span><button class="lc-btn" data-act="lc-again">Показывать это слово ещё</button></div>' +
+    '</article>';
+  }
+  function lcZone() {
+    const c = L.lc, x = c.x;
+    if (c.done) {
+      const res = c.ok === true ? '<div class="lc-res ok">' + I.check + 'Верно</div>'
+        : c.ok === false ? '<div class="lc-res no">' + I.close + (c.typed ? 'Вы написали «' + esc(c.typed) + '»' : 'Неверно') + '</div>'
+        : '';
+      return res + '<div class="lc-word"><div class="lc-w">' + esc(x.w) + '</div>' +
+        '<div class="ipa-row"><button class="spk" data-act="speak" aria-label="Произнести">' + I.spk + '</button><span>' + esc(x.ipa || '') + '</span></div>' +
+        (x.ex ? '<p class="ex"><button data-act="speak-ex" aria-label="Произнести пример">' + I.spk + '</button><span>' + esc(x.ex) + '</span></p>' : '') + '</div>';
+    }
+    if (c.mode === 'type') {
+      return '<form class="lc-type" data-form="lc"><input id="lc-in" type="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="Напишите по-английски" aria-label="Слово по-английски">' +
+        '<div class="row2"><button type="button" class="btn btn-soft" data-act="lc-show">Не помню</button><button type="submit" class="btn btn-main">Проверить</button></div></form>';
+    }
+    if (c.mode === 'choose') {
+      return '<div class="lc-grid">' + c.opts.map((o, j) => '<button class="opt en" data-lopt="' + j + '">' + esc(o.w) + '</button>').join('') + '</div>';
+    }
+    return '<div class="sq-row">' +
+      '<button class="sq" data-act="lc-type">' + I.kbd + '<span>Написать</span></button>' +
+      '<button class="sq" data-act="lc-show">' + I.eye + '<span>Посмотреть</span></button>' +
+      '<button class="sq" data-act="lc-choose">' + I.grid + '<span>Выбрать</span></button></div>';
+  }
+  function lcUpdate() {
+    const z = $('.lc-zone', ov); if (!z) return;
+    z.innerHTML = lcZone();
+    const c = L.lc;
+    $$('.lc-btn', ov).forEach(b => b.classList.remove('hl'));
+    if (c.done) {
+      $('[data-act="' + (c.ok === true ? 'lc-later' : 'lc-again') + '"]', ov).classList.add('hl');
+      const sc = $('.lc-scroll', ov); if (sc) sc.scrollTo({ top: sc.scrollHeight, behavior: 'smooth' });
+    }
+    if (c.mode === 'type' && !c.done) { const i = $('#lc-in', ov); if (i) i.focus(); }
+  }
+  function lcMode(m) {
+    const c = L && L.lc; if (!c || c.done) return;
+    c.mode = m;
+    if (m === 'choose') c.opts = shuffle([c.x, ...distractors(c.x, 'w', 3, pendingList())]);
+    lcUpdate();
+  }
+  function lcReveal(ok, typed) {
+    const c = L && L.lc; if (!c || c.done) return;
+    c.done = true; c.ok = ok; c.typed = typed || '';
+    const v = S.words[c.x.w];
+    if (v && ok === false) { v.w = (v.w || 0) + 1; saveSoon(); }
+    lcUpdate(); speak(c.x);
+  }
+  function lcCheck() {
+    const c = L && L.lc; if (!c || c.done) return;
+    const i = $('#lc-in', ov); const val = (i ? i.value : '').trim().toLowerCase().replace(/\s+/g, ' ');
+    if (!val) { if (i) i.focus(); return; }
+    if (i) i.blur();
+    lcReveal(val === c.x.w.toLowerCase(), val);
+  }
+  function lcPick(j) {
+    const c = L && L.lc; if (!c || c.done || !c.opts) return;
+    const ok = c.opts[j] === c.x, btns = $$('.lc-grid .opt', ov);
+    btns.forEach((b, i) => { if (c.opts[i] === c.x) b.classList.add('ok'); });
+    if (!ok && btns[j]) btns[j].classList.add('no');
+    c.done = true;
+    setTimeout(() => { if (L && L.lc === c) { c.done = false; lcReveal(ok); } }, ok ? 500 : 1100);
+  }
+  function lcFinish(later) {
+    const c = L && L.lc; if (!c) return;
+    const x = c.x, card = $('.lcard', ov);
+    L.lc = null;
+    if (later) {
+      const now = Date.now(), prev = S.words[x.w] || {};
+      S.words[x.w] = { s: 'l', st: 0, due: now + INTERVALS[0], t: prev.t || now, r: 0, w: prev.w || 0 };
+      day().n++; delete L.next[x.w]; save();
+    } else {
+      L.next[x.w] = L.tick + (c.ok === false || c.ok === null ? 3 : 4);
+    }
+    L.tick++; L.last = 'learn'; L.lastW = x.w;
+    if (card) { card.classList.add('leave'); setTimeout(nextLearn, 200); } else nextLearn();
+  }
+  // wrong options for "choose": similar words, never the right one
   function distractors(x, field, n, batch) {
     const out = [], used = new Set([x[field].toLowerCase()]);
     const add = y => { const v = y[field].toLowerCase(); if (y !== x && !used.has(v)) { used.add(v); out.push(y); } };
@@ -601,119 +726,6 @@
     let guard = 0;
     while (out.length < n && guard++ < 200) add(same.length > 10 ? same[Math.random() * same.length | 0] : W[Math.random() * W.length | 0]);
     return out;
-  }
-  function startTraining(list) {
-    const steps = list.map(x => ({ k: 'intro', x }));
-    steps.push(...shuffle(list.map(x => ({ k: 'ru', x }))));
-    steps.push(...shuffle(list.map(x => ({ k: 'en', x }))));
-    steps.push(...shuffle(list.map(x => ({ k: canSpell(x) ? 'spell' : 'listen', x }))));
-    T = { list, steps, i: 0, wrong: 0, tries: {}, lock: false, failed: new Set() };
-    L = null; openOverlay('train'); renderStep();
-  }
-  function trainFrame(inner) {
-    return '<div class="ses"><header class="ses-top"><button class="icon-btn" data-act="close" aria-label="Закрыть">' + I.close + '</button>' +
-      '<div class="ses-mid"><div class="ses-title">Тренировка</div><div class="progress"><i style="width:' + (100 * T.i / T.steps.length).toFixed(1) + '%"></i></div></div><span></span></header>' +
-      '<div class="train-body">' + inner + '</div></div>';
-  }
-  function renderStep() {
-    if (T.i >= T.steps.length) { finishTraining(); return; }
-    const s = T.steps[T.i], x = s.x;
-    T.lock = false; T.cur = s;
-    let h = '';
-    if (s.k === 'intro') {
-      h = '<div class="lead">Новое слово · ' + (T.i + 1) + ' из ' + T.list.length + '</div><div class="qcard intro k-' + mediaKind(x) + '">' + mediaHTML(x) + bodyHTML(x, { def: true }) + '</div>' +
-        '<button class="btn btn-main btn-wide" data-act="next">Запомнил, дальше</button>';
-    } else if (s.k === 'ru') {
-      s.opts = shuffle([x, ...distractors(x, 'ru', 3, T.list)]);
-      h = '<div class="lead">Выберите перевод</div><div class="qcard k-' + mediaKind(x) + '">' + mediaHTML(x) + bodyHTML(x, { ru: false, ex: false }) + '</div>' +
-        '<div class="opts">' + s.opts.map((o, j) => '<button class="opt" data-opt="' + j + '">' + esc(o.ru) + '</button>').join('') + '</div><div class="feedback"></div>';
-    } else if (s.k === 'en') {
-      s.opts = shuffle([x, ...distractors(x, 'w', 3, T.list)]);
-      h = '<div class="lead">Выберите слово</div><div class="qcard">' + (mediaKind(x) !== 'type' ? mediaHTML(x) : '') + '<div class="info"><div class="tags">' + (x.pos.length ? '<span class="tag">' + esc(posLabel(x)) + '</span>' : '') + '</div><div class="q-ru">' + esc(x.ru) + '</div></div></div>' +
-        '<div class="opts">' + s.opts.map((o, j) => '<button class="opt en" data-opt="' + j + '">' + esc(o.w) + '</button>').join('') + '</div><div class="feedback"></div>';
-    } else if (s.k === 'listen') {
-      s.opts = shuffle([x, ...distractors(x, 'w', 3, T.list)]);
-      h = '<div class="lead">Послушайте и выберите слово</div><button class="listen-btn" data-act="speak" aria-label="Прослушать ещё раз">' + I.spk + '</button>' +
-        '<div class="opts">' + s.opts.map((o, j) => '<button class="opt en" data-opt="' + j + '">' + esc(o.w) + '</button>').join('') + '</div><div class="feedback"></div>';
-    } else if (s.k === 'spell') {
-      const ans = x.w.toLowerCase();
-      s.sp = { ans, pos: 0, err: false, letters: shuffle(ans.split('').map((c, j) => ({ c, j }))) };
-      let slots = ''; for (let j = 0; j < ans.length; j++) slots += '<span class="slot"></span>';
-      h = '<div class="lead">Соберите слово</div><div class="qcard">' + (mediaKind(x) !== 'type' ? mediaHTML(x) : '') + '<div class="info"><div class="q-ru">' + esc(x.ru) + '</div></div></div>' +
-        '<div class="slots">' + slots + '</div><div class="tiles-l">' + s.sp.letters.map((l, j) => '<button class="ltile" data-tile="' + j + '">' + esc(l.c) + '</button>').join('') + '</div>' +
-        '<div class="feedback"></div><div class="row2"><button class="btn btn-soft" data-act="hint">Подсказка</button><button class="btn btn-soft" data-act="giveup">Не помню</button></div>';
-    }
-    ov.innerHTML = trainFrame(h);
-    bindMedia(ov);
-    if (S.set.autoplay && (s.k === 'intro' || s.k === 'ru')) speak(x);
-    if (s.k === 'listen') speak(x);
-  }
-  function requeue(s) {
-    const key = s.k + ':' + s.x.w; T.tries[key] = (T.tries[key] || 0) + 1;
-    T.failed.add(s.x.w);
-    if (T.tries[key] <= 2) T.steps.push({ k: s.k, x: s.x });
-  }
-  function pickOpt(j) {
-    const s = T.cur; if (T.lock || !s.opts) return; T.lock = true;
-    const ok = s.opts[j] === s.x;
-    const btns = $$('.opt', ov);
-    btns.forEach((b, i) => { if (s.opts[i] === s.x) b.classList.add('ok'); });
-    const fb = $('.feedback', ov);
-    if (!ok) { btns[j].classList.add('no'); T.wrong++; requeue(s); fb.className = 'feedback no'; fb.textContent = s.x.w + ' - ' + s.x.ru; }
-    else { fb.className = 'feedback ok'; fb.textContent = 'Верно'; }
-    if (s.k !== 'listen') speak(s.x);
-    setTimeout(() => { if (T && T.cur === s) { T.i++; renderStep(); } }, ok ? 750 : 1700);
-  }
-  function tapTile(j, viaKey) {
-    const s = T.cur; if (T.lock || !s.sp) return;
-    const sp = s.sp, l = sp.letters[j], tile = $$('.ltile', ov)[j];
-    if (!l || tile.classList.contains('used')) return;
-    if (l.c === sp.ans[sp.pos]) {
-      tile.classList.add('used'); placeLetter(l.c);
-    } else {
-      if (!viaKey) { tile.classList.remove('shake'); void tile.offsetWidth; tile.classList.add('shake'); }
-      if (!sp.err) { sp.err = true; T.wrong++; }
-    }
-  }
-  function placeLetter(c) {
-    const sp = T.cur.sp, slots = $$('.slot', ov);
-    slots[sp.pos].textContent = c; slots[sp.pos].classList.add('f'); sp.pos++;
-    if (sp.pos >= sp.ans.length) spellDone(!sp.err);
-  }
-  function spellHint() {
-    const s = T.cur; if (T.lock || !s.sp) return;
-    const sp = s.sp; sp.err = true;
-    const j = sp.letters.findIndex((l, i) => l.c === sp.ans[sp.pos] && !$$('.ltile', ov)[i].classList.contains('used'));
-    if (j >= 0) { $$('.ltile', ov)[j].classList.add('used'); placeLetter(sp.letters[j].c); }
-  }
-  function spellGiveUp() {
-    const s = T.cur; if (T.lock || !s.sp) return;
-    const sp = s.sp; sp.err = true;
-    const slots = $$('.slot', ov);
-    for (let j = sp.pos; j < sp.ans.length; j++) slots[j].textContent = sp.ans[j];
-    $$('.ltile', ov).forEach(t => t.classList.add('used'));
-    spellDone(false);
-  }
-  function spellDone(ok) {
-    const s = T.cur; T.lock = true;
-    $('.slots', ov).classList.add(ok ? 'done' : 'fail');
-    const fb = $('.feedback', ov);
-    fb.className = 'feedback ' + (ok ? 'ok' : 'no'); fb.textContent = ok ? 'Верно' : 'Повторим это слово ещё раз';
-    if (!ok) requeue(s);
-    speak(s.x);
-    setTimeout(() => { if (T && T.cur === s) { T.i++; renderStep(); } }, ok ? 900 : 1700);
-  }
-  function finishTraining() {
-    const now = Date.now(), d = day();
-    T.list.forEach(x => { S.words[x.w] = { s: 'l', st: 0, due: now + INTERVALS[0], t: now, r: 0 }; });
-    d.n += T.list.length; save();
-    const list = T.list, wrong = T.wrong;
-    mode = 'done';
-    ov.innerHTML = '<div class="ses"><div class="done"><div class="done-ico">🎉</div><h2>Готово!<br>+' + words(list.length) + '</h2>' +
-      '<p>' + (wrong ? 'Ошибок: ' + wrong + '. ' : 'Без единой ошибки. ') + 'Первое повторение ' + relTime(now + INTERVALS[0]) + '.</p>' +
-      '<div class="list">' + list.map(wordRow).join('') + '</div>' +
-      '<div class="btns"><button class="btn btn-main" data-act="again-learn">Учить ещё</button><button class="btn btn-soft" data-act="close">На главную</button></div></div></div>';
-    T = null;
   }
 
   // ---- review
@@ -776,8 +788,7 @@
     const t = e.target;
     const tabBtn = t.closest('[data-tab]');
     if (tabBtn) { if (tabBtn.dataset.tab === 'dict' && tab === 'dict') { D.sec = null; } showTab(tabBtn.dataset.tab); return; }
-    const opt = t.closest('[data-opt]'); if (opt && mode === 'train') { pickOpt(+opt.dataset.opt); return; }
-    const tile = t.closest('[data-tile]'); if (tile && mode === 'train') { tapTile(+tile.dataset.tile); return; }
+    const lopt = t.closest('[data-lopt]'); if (lopt && mode === 'learn') { lcPick(+lopt.dataset.lopt); return; }
     const tgl = t.closest('[data-toggle-sec]'); if (tgl) { toggleSec(tgl.dataset.toggleSec); renderDictBody(); return; }
     const secBtn = t.closest('[data-sec]'); if (secBtn) { D.sec = secBtn.dataset.sec; D.filter = 'all'; D.limit = 120; renderDict(); window.scrollTo(0, 0); return; }
     const wBtn = t.closest('[data-word]'); if (wBtn) { const x = BY.get(wBtn.dataset.word); if (x) openWord(x); return; }
@@ -794,7 +805,6 @@
     const a = t.closest('[data-act]'); if (!a) return;
     const act = a.dataset.act;
     const curX = () => {
-      if (mode === 'train' && T && T.cur) return T.cur.x;
       const c = $('.card.is-top', ov); return c ? BY.get(c.dataset.w) : null;
     };
     switch (act) {
@@ -803,17 +813,17 @@
       case 'pick': D.sec = null; D.q = ''; showTab('dict'); break;
       case 'sheet-close': closeSheet(); break;
       case 'close': closeOverlay(); break;
-      case 'again-learn': ov.hidden = true; mode = ''; startLearn(); break;
       case 'known': if (swipe) swipe.fly(-1); break;
       case 'tolearn': if (swipe) swipe.fly(1); break;
       case 'remember': if (swipe) swipe.fly(1); break;
       case 'forgot': if (swipe) swipe.fly(-1); break;
       case 'undo': undoLearn(); break;
-      case 'train': { const p = pendingList(); if (p.length) startTraining(p.slice(0, S.set.batch)); break; }
+      case 'lc-type': lcMode('type'); break;
+      case 'lc-choose': lcMode('choose'); break;
+      case 'lc-show': lcReveal(null); break;
+      case 'lc-later': lcFinish(true); break;
+      case 'lc-again': lcFinish(false); break;
       case 'reveal': reveal(); break;
-      case 'next': if (mode === 'train') { T.i++; renderStep(); } break;
-      case 'hint': spellHint(); break;
-      case 'giveup': spellGiveUp(); break;
       case 'speak': { const x = sheetMode === 'word' && !$('#sheet').hidden ? sheetWord : curX(); if (x) speak(x); break; }
       case 'speak-ex': { const x = sheetMode === 'word' && !$('#sheet').hidden ? sheetWord : curX(); if (x && x.ex) speak(null, x.ex); break; }
       case 'dict-back': D.sec = null; renderDict(); break;
@@ -835,6 +845,9 @@
     const m = e.target.closest('.media');
     if (m && !m.closest('.card')) toggleMedia(m);
   });
+  document.addEventListener('submit', e => {
+    if (e.target.dataset.form === 'lc') { e.preventDefault(); lcCheck(); }
+  });
   document.addEventListener('change', e => {
     const t = e.target;
     if (t.dataset.toggle) { S.set[t.dataset.toggle] = t.checked; save(); }
@@ -852,22 +865,22 @@
     if (!$('#sheet').hidden) { if (e.key === 'Escape') closeSheet(); return; }
     if (!mode) return;
     if (e.key === 'Escape') { closeOverlay(); return; }
+    const inInput = e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA');
+    if (mode === 'learn' && L && L.lc) {
+      const c = L.lc;
+      if (inInput) return;
+      if (!c.done && !c.mode && /^[1-3]$/.test(e.key)) { e.preventDefault(); if (e.key === '1') lcMode('type'); else if (e.key === '2') lcReveal(null); else lcMode('choose'); }
+      else if (!c.done && c.mode === 'choose' && /^[1-4]$/.test(e.key)) lcPick(+e.key - 1);
+      else if (c.done && e.key === 'ArrowRight') lcFinish(true);
+      else if (c.done && e.key === 'ArrowLeft') lcFinish(false);
+      return;
+    }
+    if (inInput) return;
     if (mode === 'learn' || mode === 'review') {
       if (e.key === 'ArrowLeft' && swipe) { e.preventDefault(); swipe.fly(-1); }
       else if (e.key === 'ArrowRight' && swipe) { e.preventDefault(); swipe.fly(1); }
       else if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); if ($('.card.is-top .ru.hide', ov)) reveal(); else { const c = $('.card.is-top', ov); if (c) speak(BY.get(c.dataset.w)); } }
       else if ((e.key === 'Backspace' || e.key === 'z') && mode === 'learn') undoLearn();
-    } else if (mode === 'train' && T && T.cur) {
-      const s = T.cur;
-      if (s.opts && /^[1-4]$/.test(e.key)) pickOpt(+e.key - 1);
-      else if (s.k === 'intro' && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); T.i++; renderStep(); }
-      else if (s.sp && /^[a-z]$/i.test(e.key)) {
-        const sp = s.sp, c = e.key.toLowerCase();
-        const tiles = $$('.ltile', ov);
-        let j = sp.letters.findIndex((l, i) => l.c === c && l.c === sp.ans[sp.pos] && !tiles[i].classList.contains('used'));
-        if (j < 0) j = sp.letters.findIndex((l, i) => l.c === c && !tiles[i].classList.contains('used'));
-        if (j >= 0) tapTile(j, false); else if (!sp.err) { sp.err = true; T.wrong++; }
-      }
     }
   });
 
